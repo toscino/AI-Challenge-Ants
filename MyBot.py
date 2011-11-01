@@ -17,9 +17,10 @@ class MyBot:
 		self.SafeDistance2 = ants.attackradius2 + 4*sqrt(ants.attackradius2) + 4
 		self.AttackDistance = sqrt(ants.attackradius2) + 2
 		self.unseen = []
-		for row in range(ants.rows):
-			for col in range(ants.cols):
-				self.unseen.append((row, col))
+		
+		for row in range((ants.rows)/10):
+			for col in range((ants.cols)/10):
+				self.unseen.append((row*10, col*10))
 		self.Hills = []
 
 		pass
@@ -81,19 +82,25 @@ class MyBot:
 			return False
 
 		def Deal_With_Food(MyAntLoc):
+			FoodDists = []
 			for FoodLoc in ants.food():
-				Dist2 = ants.distance2(MyAntLoc, FoodLoc)
-				if (Dist2 < ants.viewradius2+10):
-					if(Move_Toward_Loc(MyAntLoc, FoodLoc)):
-						return True
+				Dist = ants.distance(MyAntLoc, FoodLoc)
+				FoodDists.append((Dist, FoodLoc))
+			FoodDists.sort()
+			for Dist, FoodLoc in FoodDists:
+				if(Move_Toward_Loc(MyAntLoc, FoodLoc)):
+					return True
 			return False
 
 		def Explore(MyAntLoc):
+			UnseenDists = []
 			for UnseenLoc in self.unseen:
-				Dist2 = ants.distance2(MyAntLoc, UnseenLoc)
-				if (Dist2 < ants.viewradius2+50):
-					if(Move_Toward_Loc(MyAntLoc, UnseenLoc)):
-						return True
+				Dist = ants.distance(MyAntLoc, UnseenLoc)
+				UnseenDists.append((Dist, UnseenLoc))
+			UnseenDists.sort()
+			for Dist, UnseenLoc in UnseenDists:
+				if(Move_Toward_Loc(MyAntLoc, UnseenLoc)):
+					return True
 			return False
 
 		def Deal_With_Hills(MyAntLoc):
