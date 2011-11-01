@@ -1,56 +1,158 @@
 #!/usr/bin/env python
 from ants import *
+from math import sqrt
+
+#test
 
 # define a class with a do_turn method
 # the Ants.run method will parse and update bot input
 # it will also run the do_turn method for us
 class MyBot:
-    def __init__(self):
+	def __init__(self):
+
         # define class level variables, will be remembered between turns
-        pass
+		pass
     
     # do_setup is run once at the start of the game
     # after the bot has received the game settings
     # the ants class is created and setup by the Ants.run method
-    def do_setup(self, ants):
-        # initialize data structures after learning the game settings
-        pass
+	def do_setup(self, ants):
+		self.SafeDistance2 = ants.attackradius2 + 4*sqrt(ants.attackradius2) + 4
+		self.AttackDistance = sqrt(ants.attackradius2) + 2
+		self.unseen = []
+		for row in range(ants.rows):
+			for col in range(ants.cols):
+				self.unseen.append((row, col))
+		self.Hills = []
+
+		pass
     
     # do turn is run once per turn
     # the ants class has the game state and is updated by the Ants.run method
     # it also has several helper methods to use
-    def do_turn(self, ants):
-        # loop through all my ants and try to give them orders
-        # the ant_loc is an ant location tuple in (row, col) form
-        for ant_loc in ants.my_ants():
-            # try all directions in given order
-            directions = ('n','e','s','w')
-            for direction in directions:
-                # the destination method will wrap around the map properly
-                # and give us a new (row, col) tuple
-                new_loc = ants.destination(ant_loc, direction)
-                # passable returns true if the location is land
-                if (ants.passable(new_loc)):
-                    # an order is the location of a current ant and a direction
-                    ants.issue_order((ant_loc, direction))
-                    # stop now, don't give 1 ant multiple orders
-                    break
-            # check if we still have time left to calculate more orders
-            if ants.time_remaining() < 10:
-                break
+	def do_turn(self, ants):
+        # track all moves, prevent collisions
+
+		orders = {}
+
+		def Move_Direction(Loc, Direction):
+			NewLoc = ants.destination(Loc, Direction)
+			if (ants.unoccupied(NewLoc) and NewLoc not in orders):
+ 				ants.issue_order((Loc, Direction))
+				orders[NewLoc] = Loc
+				return True
+			else:
+				return False
+
+
+		Targets = {}
+
+		def Move_Toward_Loc(Loc, Dest):
+			Directions = ants.direction(Loc, Dest)
+			for Direction in Directions:
+				if Move_Direction(Loc, Direction):
+					Targets[Dest] = Loc
+					return True
+			return False
+
+		def Move_Away_Loc(Loc, Dest):
+			Directions = ants.Opp_Direction(Loc, Dest)
+			for Direction in Directions:
+				if Move_Direction(Loc, Direction):
+					Targets[Dest] = Loc
+					return True
+			return False
+
+
+		def Deal_With_Enemy(MyAntLoc):
+			
+			for (EnAntLoc,Owner) in ants.enemy_ants():
+				Dist2E = ants.distance2(MyAntLoc, EnAntLoc)
+				if (Dist2E <= self.SafeDistance2):
+					DistE = ants.distance2(MyAntLoc, EnAntLoc)
+					if (DistE <= self.AttackDistance):
+						for MyOtherAntLoc in ants.my_ants():
+							if (MyOtherAntLoc != MyAntLoc):
+								DistF = ants.distance(EnAntLoc, MyOtherAntLoc)
+								if (DistF <= self.AttackDistance):
+									if(Move_Toward_Loc(MyAntLoc, EnAntLoc)):
+										return True						
+					if (Dist2E == self.SafeDistance2):
+						return True
+					if (Move_Away_Loc(MyAntLoc, EnAntLoc)):
+						return True	
+			return False
+
+		def Deal_With_Food(MyAntLoc):
+			for FoodLoc in ants.food():
+				Dist2 = ants.distance2(MyAntLoc, FoodLoc)
+				if (Dist2 < ants.viewradius2+10):
+					if(Move_Toward_Loc(MyAntLoc, FoodLoc)):
+						return True
+			return False
+
+		def Explore(MyAntLoc):
+			for UnseenLoc in self.unseen:
+				Dist2 = ants.distance2(MyAntLoc, UnseenLoc)
+				if (Dist2 < ants.viewradius2+50):
+					if(Move_Toward_Loc(MyAntLoc, UnseenLoc)):
+						return True
+			return False
+
+		def Deal_With_Hills(MyAntLoc):
+			HillDists = []
+			for HillLoc in self.Hills:
+				Dist = ants.distance(MyAntLoc, HillLoc)
+				HillDists.append((Dist, HillLoc))
+			HillDists.sort()
+			for Dist, HillLoc in HillDists:
+				if(Move_Toward_Loc(MyAntLoc, HillLoc)):
+					return True				
+			return False
+
+		for loc in self.unseen[:]:
+			if ants.visible(loc):
+				self.unseen.remove(loc)
+
+		for HillLoc, hill_owner in ants.enemy_hills():
+			if HillLoc not in self.Hills:
+				self.Hills.append(HillLoc) 
+
+
+		for MyAntLoc in ants.my_ants():
+
+			#worry about enemy ants
+			if Deal_With_Enemy(MyAntLoc):
+				continue
+
+			#find food
+			if Deal_With_Food(MyAntLoc):
+				continue
+
+			#worry about enemy hills
+
+			if Deal_With_Hills(MyAntLoc):
+				continue
+
+			#explore
+			if Explore(MyAntLoc):
+				continue
+
+			if ants.time_remaining() < 10:
+				break
             
 if __name__ == '__main__':
     # psyco will speed up python a little, but is not needed
-    try:
-        import psyco
-        psyco.full()
-    except ImportError:
-        pass
+	try:
+		import psyco
+		psyco.full()
+	except ImportError:
+		pass
     
-    try:
+	try:
         # if run is passed a class with a do_turn method, it will do the work
         # this is not needed, in which case you will need to write your own
         # parsing function and your own game state class
-        Ants.run(MyBot())
-    except KeyboardInterrupt:
-        print('ctrl-c, leaving ...')
+		Ants.run(MyBot())
+	except KeyboardInterrupt:
+		print('ctrl-c, leaving ...')
